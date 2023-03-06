@@ -1,0 +1,10 @@
+Notes for gyro.ino:
+
+Make sure to change the max time variable to determine the total data collection time.
+The max time variable is in MILISECONDS.
+
+Unless the wiring is redone, leave "chipSelect" as 10 for both the nano and Uno.
+
+Current data collection rate is once per 10 ms.
+
+The blink pin variable can be changed to any digital port assuming thats were the LED is connected.
