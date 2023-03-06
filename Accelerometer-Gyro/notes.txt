@@ -8,3 +8,5 @@ Unless the wiring is redone, leave "chipSelect" as 10 for both the nano and Uno.
 Current data collection rate is once per 10 ms.
 
 The blink pin variable can be changed to any digital port assuming thats were the LED is connected.
+
+Current maximum acceleration is set to 2G!! (can be changed)
