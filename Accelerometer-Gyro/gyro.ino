@@ -4,19 +4,79 @@
 #include <SPI.h>
 #include <SD.h>
 
-//global variables
-const int chipSelect = 10; //port connected to SD data
+/* global variables */
+const int chipSelect = 10;
 Adafruit_MMA8451 mma = Adafruit_MMA8451();
-unsigned long myTime; //to keep track of time
-unsigned long MAXTIME = 30000; //max time to run
-int blink_pin = 2; //pin to control led
+//for keeping track of time
+unsigned long curr_Time;
+const unsigned long MAXTIME_COEFF = 30000;
+unsigned long end_Time;
+
+/* LED Pins */
+const int MSB_LED = 2;
+const int LSB_LED = 3;
+
+
+/* Displays Current Divice mode using leds:
+ *   0 0 == no power 
+ *   0 1 == awaiting sd_card 
+ *   1 0 == data being collected 
+ *   1 1 == data collection complete
+ */
+void display_mode(bool led_1, bool led_2) {
+  //first led
+  if (led_1) {
+    digitalWrite(MSB_LED, HIGH);
+  }
+  else {
+    digitalWrite(MSB_LED, LOW);
+  }
+
+  //second led
+  if (led_2) {
+    digitalWrite(LSB_LED, HIGH);
+  }
+  else {
+    digitalWrite(LSB_LED, LOW);
+  }
+}
+
+/* Function that handles the time
+ *  in between when the device is powered and
+ *  the SD card is inserted
+ */
+void initialize_SD(){
+   // dispplaying status
+   Serial.print("Initializing SD card...");
+
+  // waiting for the SD card to be inserted
+  while (!SD.begin(chipSelect)) {
+    //displaying current mode
+    Serial.println("Card failed, or not present");
+    display_mode(false, true);
+    delay(10);
+  }
+
+  // updating state and max run time
+  display_mode(true, false);
+  end_Time = millis() + MAXTIME_COEFF; //factoring in current time to find end time
+  
+  // marking in file the beggining of data collection
+  Serial.println("card initialized.");
+  File dataFile = SD.open("datalog.txt", FILE_WRITE);
+  if (dataFile) {
+    dataFile.println("\nBEGGINING DATA COLLECTION");
+    dataFile.close();
+  }
+}
 
 void setup(void) {
-  //setting up pins
+  /* setting up pins */
   Serial.begin(9600);
-  pinMode(blink_pin, OUTPUT);    // sets the digital pin 13 as output
+  pinMode(MSB_LED, OUTPUT);
+  pinMode(LSB_LED, OUTPUT);
   
-  //setting up gyro
+  /* Initializing Gyroscope */
   Serial.println("INITIALIZING Adafruit MMA8451!!");
   if (! mma.begin()) {
     Serial.println("Couldnt start");
@@ -25,49 +85,40 @@ void setup(void) {
   Serial.println("MMA8451 found!");
   mma.setRange(MMA8451_RANGE_2_G);
 
-  //setting up SD card
-  Serial.print("Initializing SD card...");
-  if (!SD.begin(chipSelect)) {   // see if the card is present and can be initialized:
-    Serial.println("Card failed, or not present");
-    // don't do anything more:
-    while (1);
-  }
-  Serial.println("card initialized.");
-  //marking in the file when data starts
-  File dataFile = SD.open("datalog.txt", FILE_WRITE);
-
-  // if the file is available, write to it:
-  if (dataFile) {
-    dataFile.println("\n----STARTING DATA COLLECTION----");
-    dataFile.close();
-  }
+  /* Initializing LED */
+  initialize_SD();
 }
 
 void loop() {
   //keeping track of time
-  myTime = millis();
-  if (myTime < MAXTIME) {
+  curr_Time = millis();
+  if (curr_Time < end_Time) {
     collect_data();
+    display_mode(true, false);
   }
-  //once data collection is completed blink led and stop data collection
   else {
-    blink_led();
+    //data collection completed
+    blink_2_led(MSB_LED, LSB_LED); //blinking 1 1
     Serial.println("ENDED DATA COLLECTION");
   }
   delay(10);
 }
 
-//blinks an led at 1hz
-void blink_led() {
-  digitalWrite(blink_pin, HIGH); // sets the digital pin 13 on
-  delay(1000);            // waits for a second
-  digitalWrite(blink_pin, LOW);  // sets the digital pin 13 off
-  delay(1000);            // waits for a second
+/* Blinks LED at 0.5hz */
+void blink_2_led(int led_1, int led_2) {
+  digitalWrite(led_1, HIGH); 
+  digitalWrite(led_2, HIGH); 
+  delay(1000);            
+  digitalWrite(led_1, LOW); 
+  digitalWrite(led_2, LOW);  
+  delay(1000);            
 }
 
-void collect_data() {
-  //-----getting sensor data--------
-  mma.read();   // Read the 'raw' data in 14-bit counts
+/* Main Function to collect and record data */
+void collect_data() {  //keeping track of time
+  //getting sensor data
+  // Read the 'raw' data in 14-bit counts
+  mma.read();
   /* Get the orientation of the sensor */
   uint8_t o = mma.getOrientation();
   String direct = "";
